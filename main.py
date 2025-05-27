@@ -434,31 +434,30 @@ def enhanced_content_mixer(blog_results, target_keyword, target_location="Tokyo"
     return mixed_content
 
 # =============================================================================
-# WordPress 자동 포스터 (간단 버전)
+# WordPress 자동 포스터 (Make Connector API 방식)
 # =============================================================================
 
 class WordPressAutoPoster:
-    def __init__(self, site_url, username, app_password):
+    def __init__(self, site_url, username, api_key):
         self.site_url = site_url.rstrip('/')
         self.username = username
-        self.app_password = app_password
+        self.api_key = api_key
         self.api_url = f"{self.site_url}/wp-json/wp/v2"
         
-        # 인증 헤더 생성
-        credentials = f"{username}:{app_password}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        # Make Connector API 헤더 생성
         self.headers = {
-            'Authorization': f'Basic {encoded_credentials}',
-            'Content-Type': 'application/json'
+            'X-API-Key': api_key,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; MakeConnector/1.0)'
         }
     
-    def create_post(self, title, content, status='publish'):
-        """워드프레스에 글 작성 (간단 버전)"""
+    def create_post(self, title, content, status='draft'):
+        """워드프레스에 드래프트로 글 작성"""
         
         post_data = {
             'title': title,
             'content': content,
-            'status': status,
+            'status': status,  # 'draft'로 설정하여 드래프트로 저장
             'format': 'standard'
         }
         
@@ -468,14 +467,15 @@ class WordPressAutoPoster:
             
             if response.status_code == 201:
                 post_data = response.json()
-                print(f"✅ 글 작성 성공!")
+                print(f"✅ 드래프트 글 작성 성공!")
                 print(f"📝 제목: {post_data['title']['rendered']}")
-                print(f"🔗 URL: {post_data['link']}")
+                print(f"🔗 편집 URL: {self.site_url}/wp-admin/post.php?post={post_data['id']}&action=edit")
                 
                 return {
                     'id': post_data['id'],
                     'title': post_data['title']['rendered'],
                     'url': post_data['link'],
+                    'edit_url': f"{self.site_url}/wp-admin/post.php?post={post_data['id']}&action=edit",
                     'status': post_data['status']
                 }
             else:
@@ -614,14 +614,14 @@ def generate_blog():
         
         # 2. WordPress 자동 포스팅 (환경변수에서 설정 읽기)
         wp_username = os.environ.get('WP_USERNAME')
-        wp_app_password = os.environ.get('WP_APP_PASSWORD')
+        wp_api_key = os.environ.get('WP_API_KEY')  # WP_APP_PASSWORD에서 WP_API_KEY로 변경
         
-        if wp_username and wp_app_password:
+        if wp_username and wp_api_key:
             try:
                 wp_poster = WordPressAutoPoster(
                     site_url="https://nevotales.com",
                     username=wp_username,
-                    app_password=wp_app_password
+                    api_key=wp_api_key  # API 키 방식으로 변경
                 )
                 
                 # HTML 형식의 글 내용 생성
@@ -637,7 +637,7 @@ def generate_blog():
                 wp_result = wp_poster.create_post(
                     title=result['article']['title'],
                     content=html_content,
-                    status='publish'
+                    status='draft'  # 드래프트로 변경
                 )
                 
                 if wp_result:
@@ -645,10 +645,12 @@ def generate_blog():
                         "success": True,
                         "keyword": keyword,
                         "location": location,
-                        "wordpress_url": wp_result["url"],
+                        "wordpress_edit_url": wp_result["edit_url"],  # 편집 URL 추가
                         "title": wp_result["title"],
                         "images_count": len(result["images"]),
                         "word_count": result["article"]["word_count"],
+                        "status": "draft",  # 드래프트 상태 표시
+                        "message": "글이 드래프트로 저장되었습니다. 편집 후 발행해주세요.",
                         "timestamp": datetime.utcnow().isoformat()
                     }
                 else:
