@@ -1,4 +1,4 @@
-# MoneyMaking_Crawler v3.0 - 글로벌 크롤링 시스템
+# MoneyMaking_Crawler v3.1 - 개선된 필터링 시스템
 import os
 import requests
 import json
@@ -70,16 +70,59 @@ TARGET_COUNTRIES = {
     'austria': {'domain': 'google.at', 'lang': 'de', 'translate_to': 'de'}
 }
 
-# 개인 블로그 판별 키워드
+# 개인 블로그 판별 키워드 (대폭 확장)
 PERSONAL_BLOG_INDICATORS = [
     'blog', 'diary', 'travel', 'journey', 'experience', 'visit', 'trip',
-    'my', 'personal', 'life', 'adventure', 'story', 'log'
+    'my', 'personal', 'life', 'adventure', 'story', 'log', 'went', 'been',
+    'vacation', 'holiday', 'backpack', 'solo', 'couple', 'family',
+    'review', 'guide', 'tips', 'recommendation', 'amazing', 'beautiful',
+    'incredible', 'awesome', 'wonderful', 'memories', 'discover', 'explore',
+    'wandering', 'nomad', 'traveler', 'blogger', 'chronicles', 'tales',
+    'adventures', 'experiences', 'memories', 'photos', 'pictures', 'moments'
 ]
 
+# 기업/여행사 사이트 완전 차단 (대폭 강화)
 CORPORATE_EXCLUSIONS = [
-    'booking.com', 'tripadvisor', 'expedia', 'hotels.com', 'airbnb',
-    'wikipedia', 'wikitravel', 'lonelyplanet', 'touropia', 'timeout',
-    'cnn.com', 'bbc.com', 'reuters.com', 'news', 'commercial'
+    # 예약 사이트
+    'booking.com', 'agoda.com', 'expedia.com', 'hotels.com', 'airbnb.com',
+    'kayak.com', 'priceline.com', 'orbitz.com', 'travelocity.com',
+    'cheaptickets.com', 'momondo.com', 'skyscanner.com', 'trivago.com',
+    
+    # 호스텔/숙박
+    'hostelworld.com', 'hostelbookers.com', 'hostelz.com', 'hostels.com',
+    
+    # 투어/액티비티
+    'viator.com', 'getyourguide.com', 'klook.com', 'tiqets.com',
+    'civitatis.com', 'attractiontix.com', 'citypass.com', 'isango.com',
+    
+    # 여행 포털/매거진
+    'tripadvisor.com', 'lonelyplanet.com', 'roughguides.com', 'fodors.com',
+    'frommers.com', 'ricksteves.com', 'atlasобscura.com', 'culturetrip.com',
+    'theculturetrip.com', 'planetware.com', 'tripsavvy.com', 'afar.com',
+    'travelandleisure.com', 'cntraveler.com', 'timeout.com', 'touropia.com',
+    
+    # 뉴스/매거진
+    'cnn.com', 'bbc.com', 'reuters.com', 'nationalgeographic.com',
+    'smithsonianmag.com', 'buzzfeed.com', 'huffpost.com',
+    
+    # 위키/정보
+    'wikipedia.org', 'wikitravel.org', 'wikivoyage.org', 'wikimapia.org',
+    
+    # 쇼핑/딜
+    'groupon.com', 'livingsocial.com', 'travelzoo.com', 'travel.com',
+    
+    # 정부/공식
+    'gov', 'government', 'official', 'tourism', 'visitkorea', 'visit',
+    'destination', 'chamber', 'convention', 'bureau', 'authority',
+    
+    # 기타 기업
+    'yelp.com', 'foursquare.com', 'facebook.com', 'instagram.com',
+    'twitter.com', 'youtube.com', 'pinterest.com', 'reddit.com',
+    
+    # 키워드 패턴
+    'destination', 'tourism', 'visit', 'official', 'chamber', 'convention',
+    'bureau', 'authority', 'commercial', 'advertisement', 'sponsored',
+    'affiliate', 'deals', 'discount', 'cheap', 'best-price', 'compare-prices'
 ]
 
 def translate_keyword(keyword, target_lang):
@@ -106,90 +149,145 @@ def translate_keyword(keyword, target_lang):
         return keyword
 
 def is_personal_blog(url, title, description):
-    """개인 블로그인지 판별"""
+    """개인 블로그인지 판별 (더 관대한 기준)"""
     url_lower = url.lower()
     title_lower = title.lower() if title else ""
     desc_lower = description.lower() if description else ""
     
-    # 기업 사이트 제외
+    # 기업 사이트 강력 제외
     for exclusion in CORPORATE_EXCLUSIONS:
         if exclusion in url_lower:
+            print(f"❌ 기업 사이트 제외: {url} (포함: {exclusion})")
             return False
     
-    # 개인 블로그 지표 확인
+    # 개인 블로그 지표 확인 (기준 완화: 1개만 있어도 OK)
     text_to_check = f"{url_lower} {title_lower} {desc_lower}"
     personal_score = sum(1 for indicator in PERSONAL_BLOG_INDICATORS if indicator in text_to_check)
     
-    return personal_score >= 2
+    # 추가 개인 블로그 패턴
+    personal_patterns = [
+        'wordpress.com', 'blogspot.com', 'blogger.com', 'medium.com',
+        'tumblr.com', 'ghost.io', 'substack.com', 'wix.com', 'squarespace.com',
+        '/blog/', '/travel/', '/diary/', '/journal/', '/adventure/'
+    ]
+    
+    pattern_score = sum(1 for pattern in personal_patterns if pattern in url_lower)
+    
+    total_score = personal_score + pattern_score
+    is_personal = total_score >= 1  # 기준 대폭 완화: 1점만 있어도 개인 블로그로 인정
+    
+    print(f"{'✅' if is_personal else '❌'} 블로그 판별: {url[:50]}... (점수: {total_score})")
+    return is_personal
 
-def search_google_country(keyword, country_info, max_results=10):
-    """특정 국가의 Google에서 개인 블로그 검색"""
+def search_google_country(keyword, country_info, max_results=15):
+    """특정 국가의 Google에서 개인 블로그 검색 (더 많은 결과)"""
     
     # 키워드를 해당 국가 언어로 번역
     translated_keyword = translate_keyword(keyword, country_info['translate_to'])
     
-    # Google 검색 URL 구성
-    search_query = f"{translated_keyword} blog personal travel experience"
-    encoded_query = quote_plus(search_query)
+    # 더 다양한 검색 쿼리 시도
+    search_queries = [
+        f"{translated_keyword} blog personal experience",
+        f"{translated_keyword} travel diary",
+        f"{translated_keyword} my trip",
+        f"{translated_keyword} adventure blog"
+    ]
     
-    search_url = f"https://www.{country_info['domain']}/search?q={encoded_query}&num={max_results}&hl={country_info['lang']}"
+    all_results = []
     
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept-Language': f"{country_info['lang']},en;q=0.9",
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-    }
-    
-    try:
-        print(f"🔍 {country_info['domain']}에서 검색 중: {translated_keyword}")
-        response = requests.get(search_url, headers=headers, timeout=15)
+    for search_query in search_queries:
+        if len(all_results) >= 5:  # 각 나라에서 최대 5개
+            break
+            
+        encoded_query = quote_plus(search_query)
+        search_url = f"https://www.{country_info['domain']}/search?q={encoded_query}&num={max_results}&hl={country_info['lang']}"
         
-        if response.status_code != 200:
-            print(f"❌ 검색 실패: {response.status_code}")
-            return []
+        # 더 다양한 User-Agent 사용
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
+        ]
         
-        soup = BeautifulSoup(response.text, 'html.parser')
-        results = []
+        headers = {
+            'User-Agent': random.choice(user_agents),
+            'Accept-Language': f"{country_info['lang']},en;q=0.9",
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+        }
         
-        # Google 검색 결과 파싱
-        for result in soup.find_all('div', class_='g')[:max_results]:
-            try:
-                link_elem = result.find('a')
-                if not link_elem or not link_elem.get('href'):
-                    continue
-                
-                url = link_elem['href']
-                if url.startswith('/url?q='):
-                    url = url.split('/url?q=')[1].split('&')[0]
-                
-                title_elem = result.find('h3')
-                title = title_elem.get_text() if title_elem else ""
-                
-                desc_elem = result.find('span', class_='aCOpRe')
-                if not desc_elem:
-                    desc_elem = result.find('div', class_='VwiC3b')
-                description = desc_elem.get_text() if desc_elem else ""
-                
-                # 개인 블로그 판별
-                if is_personal_blog(url, title, description):
-                    results.append({
-                        'url': url,
-                        'title': title,
-                        'description': description,
-                        'country': country_info['domain'],
-                        'language': country_info['lang']
-                    })
-                    print(f"✅ 개인 블로그 발견: {title[:50]}...")
-                
-            except Exception as e:
+        try:
+            print(f"🔍 {country_info['domain']}에서 검색: {search_query}")
+            response = requests.get(search_url, headers=headers, timeout=15)
+            
+            if response.status_code != 200:
+                print(f"❌ 검색 실패: {response.status_code}")
                 continue
-        
-        print(f"📊 {country_info['domain']}: {len(results)}개 개인 블로그 발견")
-        return results
-        
-    except Exception as e:
-        print(f"❌ {country_info['domain']} 검색 오류: {e}")
-        return []
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 더 다양한 Google 결과 파싱 시도
+            search_results = soup.find_all('div', class_='g') or soup.find_all('div', class_='tF2Cxc')
+            
+            for result in search_results[:max_results]:
+                if len(all_results) >= 5:
+                    break
+                    
+                try:
+                    # 링크 추출
+                    link_elem = result.find('a', href=True)
+                    if not link_elem:
+                        continue
+                    
+                    url = link_elem['href']
+                    if url.startswith('/url?q='):
+                        url = url.split('/url?q=')[1].split('&')[0]
+                    elif url.startswith('/search'):
+                        continue
+                    
+                    if not url.startswith('http'):
+                        continue
+                    
+                    # 제목 추출
+                    title_elem = result.find('h3') or result.find('a')
+                    title = title_elem.get_text() if title_elem else ""
+                    
+                    # 설명 추출
+                    desc_candidates = result.find_all(['span', 'div'], class_=True)
+                    description = ""
+                    for candidate in desc_candidates:
+                        text = candidate.get_text().strip()
+                        if len(text) > 20 and len(text) < 200:
+                            description = text
+                            break
+                    
+                    # 개인 블로그 판별 (완화된 기준)
+                    if is_personal_blog(url, title, description):
+                        all_results.append({
+                            'url': url,
+                            'title': title,
+                            'description': description,
+                            'country': country_info['domain'],
+                            'language': country_info['lang'],
+                            'search_query': search_query
+                        })
+                        print(f"✅ 개인 블로그 발견: {title[:50]}...")
+                    
+                except Exception as e:
+                    print(f"결과 파싱 오류: {e}")
+                    continue
+            
+            time.sleep(random.uniform(1, 3))  # 랜덤 딜레이
+            
+        except Exception as e:
+            print(f"❌ {country_info['domain']} 검색 오류: {e}")
+            continue
+    
+    print(f"📊 {country_info['domain']}: {len(all_results)}개 개인 블로그 발견")
+    return all_results
 
 def process_4_3_image(img_data, keyword, index):
     """이미지를 4:3 비율로 처리하고 변조"""
@@ -260,14 +358,14 @@ def extract_blog_content(url, language):
         text_elements = soup.find_all(['p', 'div', 'article', 'section', 'main'])
         text_content = " ".join([elem.get_text(strip=True) for elem in text_elements])
         
-        if len(text_content) < 500:  # 너무 짧은 글 제외
+        if len(text_content) < 300:  # 최소 길이 기준 완화
             return None
         
         # 이미지 추출
         images = []
         img_tags = soup.find_all('img')
         
-        for i, img in enumerate(img_tags[:20]):  # 최대 20개까지
+        for i, img in enumerate(img_tags[:25]):  # 최대 25개까지
             try:
                 img_url = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
                 if not img_url:
@@ -286,11 +384,11 @@ def extract_blog_content(url, language):
                 if img_response.status_code == 200:
                     img_data = img_response.content
                     
-                    # 이미지 크기 확인
+                    # 이미지 크기 확인 (기준 완화)
                     try:
                         with Image.open(BytesIO(img_data)) as test_img:
                             width, height = test_img.size
-                            if width >= 200 and height >= 150:  # 최소 크기 체크
+                            if width >= 150 and height >= 100:  # 크기 기준 완화
                                 processed_path = process_4_3_image(img_data, "image", len(images))
                                 if processed_path:
                                     images.append(processed_path)
@@ -572,7 +670,7 @@ def upload_to_google_drive(docx_path, keyword, location):
 @app.route("/")
 def home():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.0 - 글로벌 크롤링 시스템",
+        "message": "💰 MoneyMaking_Crawler v3.1 - 개선된 필터링 시스템",
         "status": "🚀 DEPLOYED ON RAILWAY",
         "purpose": "10개국 개인 블로그 크롤링 → 2500단어 개인 경험담 생성 → Word 문서 자동 저장",
         "features": [
@@ -580,7 +678,16 @@ def home():
             "🔍 키워드 자동 번역 (각국 언어)",
             "📝 2500단어 개인 경험담 생성",
             "🖼️ 이미지 4:3 변조 및 Word 삽입",
-            "☁️ Google Drive 자동 저장"
+            "☁️ Google Drive 자동 저장",
+            "🚫 여행사이트 강력 차단",
+            "✅ 개인 블로그 필터링 완화"
+        ],
+        "improvements": [
+            "여행사이트 차단 대폭 강화 (50+ 사이트)",
+            "개인 블로그 판별 기준 완화 (점수 2→1)",
+            "검색 쿼리 다양화 (4가지 패턴)",
+            "이미지 크기 기준 완화",
+            "User-Agent 로테이션"
         ],
         "endpoints": {
             "home": "/",
@@ -594,56 +701,74 @@ def home():
 @app.route("/test")
 def test():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.0 System Check",
+        "message": "💰 MoneyMaking_Crawler v3.1 System Check",
         "google_cloud": "✅ Connected" if credentials else "❌ Not Connected",
         "google_drive": "✅ Connected" if drive_service else "❌ Not Connected",
         "translate_service": "✅ Connected" if translate_client else "❌ Not Connected",
         "target_countries": len(TARGET_COUNTRIES),
-        "status": "🚀 READY FOR GLOBAL CRAWLING",
+        "corporate_exclusions": len(CORPORATE_EXCLUSIONS),
+        "personal_indicators": len(PERSONAL_BLOG_INDICATORS),
+        "filtering_improvements": {
+            "개인블로그_기준": "완화됨 (1점 이상)",
+            "여행사이트_차단": f"{len(CORPORATE_EXCLUSIONS)}개 사이트",
+            "검색_쿼리": "4가지 패턴",
+            "User_Agent": "4가지 로테이션"
+        },
+        "status": "🚀 READY FOR IMPROVED CRAWLING",
         "platform": "Railway",
         "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.route("/global_crawl", methods=['GET', 'POST'])
 def global_crawl():
-    """💰 글로벌 크롤링 메인 엔드포인트"""
+    """💰 개선된 글로벌 크롤링 메인 엔드포인트"""
     
     try:
         # 파라미터 받기
         if request.method == 'GET':
             keyword = request.args.get("keyword", "travel")
             location = request.args.get("location", "Europe")
+            max_blogs = int(request.args.get("max_blogs", "3"))
         else:
             data = request.get_json() or {}
             keyword = data.get("keyword", "travel")
             location = data.get("location", "Europe")
+            max_blogs = int(data.get("max_blogs", "3"))
         
         start_time = datetime.utcnow()
-        print(f"💰 글로벌 크롤링 시작: {keyword} in {location}")
+        print(f"💰 개선된 글로벌 크롤링 시작: {keyword} in {location}")
         
-        # 1단계: 10개국에서 개인 블로그 검색
-        print("🌍 1단계: 글로벌 개인 블로그 검색...")
+        # 1단계: 10개국에서 개인 블로그 검색 (개선된 필터링)
+        print("🌍 1단계: 개선된 개인 블로그 검색...")
         all_blog_results = []
         
+        countries_tried = 0
         for country_name, country_info in TARGET_COUNTRIES.items():
-            if len(all_blog_results) >= 10:  # 10개 수집되면 중단
+            if len(all_blog_results) >= max_blogs:  # 목표 달성하면 중단
                 break
                 
-            print(f"\n🔍 {country_name} 검색 중...")
-            country_results = search_google_country(keyword, country_info, max_results=5)
+            countries_tried += 1
+            print(f"\n🔍 {country_name} 검색 중 ({countries_tried}/10)...")
+            country_results = search_google_country(keyword, country_info, max_results=20)
             
             for result in country_results:
-                if len(all_blog_results) >= 10:
+                if len(all_blog_results) >= max_blogs:
                     break
                 all_blog_results.append(result)
             
-            time.sleep(2)  # 요청 간격 조절
+            print(f"📊 현재까지 수집: {len(all_blog_results)}/{max_blogs}개")
+            time.sleep(random.uniform(2, 4))  # 랜덤 딜레이
         
         if not all_blog_results:
             return {
                 "success": False,
-                "error": "개인 블로그를 찾을 수 없습니다",
+                "error": "개선된 필터링으로도 개인 블로그를 찾을 수 없습니다",
                 "stage": "blog_search",
+                "debug_info": {
+                    "countries_tried": countries_tried,
+                    "max_blogs_target": max_blogs,
+                    "filtering_used": "v3.1 개선된 필터링"
+                },
                 "timestamp": datetime.utcnow().isoformat()
             }
         
@@ -665,13 +790,14 @@ def global_crawl():
             else:
                 print(f"❌ 실패: {blog_result['url']}")
             
-            time.sleep(1)  # 요청 간격 조절
+            time.sleep(random.uniform(1, 2))  # 요청 간격 조절
         
         if not blog_contents:
             return {
                 "success": False,
                 "error": "블로그 내용을 추출할 수 없습니다",
                 "stage": "content_extraction",
+                "found_blogs": len(all_blog_results),
                 "timestamp": datetime.utcnow().isoformat()
             }
         
@@ -723,7 +849,16 @@ def global_crawl():
                 "📖 성공적 크롤링": len(blog_contents),
                 "🖼️ 수집된 이미지": len(all_images),
                 "📝 최종 단어 수": personal_article['word_count'],
-                "🎯 상태": "완료"
+                "🎯 상태": "v3.1 개선된 필터링으로 완료",
+                "🚫 차단된 여행사이트": len(CORPORATE_EXCLUSIONS)
+            },
+            
+            "filtering_improvements": {
+                "개인블로그_기준": "1점 이상 (완화됨)",
+                "여행사이트_차단": f"{len(CORPORATE_EXCLUSIONS)}개 사이트",
+                "검색_다양화": "4가지 쿼리 패턴",
+                "User_Agent_로테이션": "4가지",
+                "이미지_기준_완화": "150x100px → 관대한 기준"
             },
             
             "blog_sources": [
@@ -731,7 +866,8 @@ def global_crawl():
                     "title": result['title'],
                     "url": result['url'],
                     "country": result['country'],
-                    "language": result['language']
+                    "language": result['language'],
+                    "search_query": result.get('search_query', '')
                 } for result in all_blog_results
             ],
             
@@ -759,20 +895,22 @@ def global_crawl():
                 "4단계": "어필리에이트 링크 및 상품 추천 섹션 추가",
                 "5단계": "SEO 최적화 (메타 태그, 키워드 밀도)",
                 "6단계": "게시 후 Google 검색 노출 대기",
-                "💡 꿀팁": "개인 경험담 스타일이라 신뢰도 높음, 어필리에이트 전환율 극대화"
+                "💡 꿀팁": "v3.1 필터링으로 더 순수한 개인 경험담, 신뢰도 극대화"
             },
             
             "technical_details": {
-                "countries_searched": list(TARGET_COUNTRIES.keys()),
-                "translation_languages": [info['lang'] for info in TARGET_COUNTRIES.values()],
+                "countries_searched": countries_tried,
+                "countries_available": list(TARGET_COUNTRIES.keys()),
                 "processing_time": f"{processing_time:.2f}초",
                 "generated_at": end_time.isoformat(),
-                "api_version": "MoneyMaking_Crawler v3.0"
+                "api_version": "MoneyMaking_Crawler v3.1",
+                "improvements": "필터링 개선, 여행사이트 차단 강화"
             }
         }
         
-        print(f"\n🎉 글로벌 크롤링 완료!")
+        print(f"\n🎉 개선된 글로벌 크롤링 완료!")
         print(f"💰 최종 결과: {personal_article['word_count']}단어, {len(all_images)}개 이미지")
+        print(f"🚫 여행사이트 {len(CORPORATE_EXCLUSIONS)}개 차단")
         print(f"⏱️ 총 처리 시간: {processing_time:.1f}초")
         
         return final_result
@@ -783,11 +921,13 @@ def global_crawl():
             "error": str(e),
             "error_type": type(e).__name__,
             "stage": "unknown",
+            "api_version": "v3.1",
             "timestamp": datetime.utcnow().isoformat(),
             "troubleshooting": {
                 "확인사항_1": "Google 서비스 계정 설정 확인",
                 "확인사항_2": "네트워크 연결 상태 확인",
-                "확인사항_3": "키워드 및 위치 파라미터 확인"
+                "확인사항_3": "키워드 및 위치 파라미터 확인",
+                "개선사항": "v3.1 필터링 시스템 적용됨"
             }
         }
 
@@ -809,14 +949,23 @@ def quick_test():
         return {
             "success": True,
             "quick_test_results": {
-                "💰 시스템 상태": "정상 작동",
+                "💰 시스템 상태": "v3.1 개선된 필터링 정상 작동",
                 "🌍 테스트 번역": test_translations,
                 "🔧 Google 서비스": "✅ 연결됨" if credentials else "❌ 연결 안됨",
                 "📁 Drive 서비스": "✅ 연결됨" if drive_service else "❌ 연결 안됨",
+                "🚫 여행사이트 차단": f"{len(CORPORATE_EXCLUSIONS)}개 사이트",
+                "✅ 개인블로그 기준": "1점 이상 (완화됨)",
                 "⚡ 처리 속도": "빠름",
-                "🎯 준비 상태": "글로벌 크롤링 준비 완료"
+                "🎯 준비 상태": "개선된 글로벌 크롤링 준비 완료"
             },
-            "next_step": "global_crawl 엔드포인트로 실제 크롤링 시작",
+            "improvements_v31": [
+                "여행사이트 차단 50+ 사이트로 확장",
+                "개인 블로그 판별 기준 2점→1점으로 완화",
+                "검색 쿼리 4가지 패턴으로 다양화",
+                "이미지 크기 기준 완화",
+                "User-Agent 로테이션 4가지"
+            ],
+            "next_step": "global_crawl 엔드포인트로 개선된 크롤링 시작",
             "platform": "Railway",
             "timestamp": datetime.utcnow().isoformat()
         }
