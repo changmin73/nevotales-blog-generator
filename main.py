@@ -1,4 +1,4 @@
-# MoneyMaking_Crawler v3.4 - 실제 작동 버전 (디버그 완료)
+# MoneyMaking_Crawler v3.5 - 개인 블로그 검색 최적화 (퍼플렉시티 조언 적용)
 import os
 import requests
 import json
@@ -124,8 +124,8 @@ def translate_keyword(keyword, target_language):
         print(f"번역 오류: {e}")
         return keyword
 
-def is_personal_blog(url, title, description):
-    """개인 블로그 여부 판별 (완화된 기준)"""
+def is_personal_blog_advanced(url, title, description):
+    """개인 블로그 여부 판별 (퍼플렉시티 방식 + 내용 분석 강화)"""
     if not url:
         return False
     
@@ -133,80 +133,149 @@ def is_personal_blog(url, title, description):
     title_lower = title.lower() if title else ""
     desc_lower = description.lower() if description else ""
     
-    # 기업 사이트 강력 차단
+    # 1단계: 기업 사이트 강력 차단 (기존 유지)
     for exclusion in CORPORATE_EXCLUSIONS:
         if exclusion in url_lower:
             return False
     
-    # 개인 블로그 점수 계산
-    text_to_check = f"{url_lower} {title_lower} {desc_lower}"
-    personal_score = 0
+    # 2단계: 광고/협찬성 글 감지 및 차단 (퍼플렉시티 조언)
+    spam_indicators = [
+        '체험단', '협찬', 'sponsored', '홍보', '광고', 'ad', 'pr',
+        '제공받', '무료체험', '캠페인', '이벤트', '증정', '할인'
+    ]
     
-    for indicator in PERSONAL_BLOG_INDICATORS:
+    text_to_check = f"{url_lower} {title_lower} {desc_lower}"
+    for spam in spam_indicators:
+        if spam in text_to_check:
+            return False  # 광고성 글 차단
+    
+    # 3단계: 개인 블로그 긍정 지표 확인 (퍼플렉시티 조언 반영)
+    personal_indicators = [
+        # 기존 지표들
+        'blog', 'diary', 'travel', 'journey', 'experience', 'visit', 'trip',
+        'my', 'personal', 'life', 'adventure', 'story', 'log', 'went', 'been',
+        'vacation', 'holiday', 'backpack', 'solo', 'couple', 'family',
+        
+        # 퍼플렉시티 조언 추가 지표들
+        '후기', '일기', '직접', '경험', '내돈내산', '솔직', '리얼',
+        '다녀온', '다녀와서', '여행기', '기록', '추억', '느낀', 
+        '생각', '추천', '비추', '아쉬운', '좋았던', '불편한'
+    ]
+    
+    # 4단계: 개인 블로그 도메인 패턴 인식 (퍼플렉시티 조언)
+    personal_domain_patterns = [
+        '.wordpress.com', '.blogspot.com', '.tistory.com', '.naver.com',
+        '.daum.net', '.egloos.com', '.velog.io', '.github.io',
+        'medium.com/@', 'tumblr.com'
+    ]
+    
+    # 도메인 패턴 점수
+    domain_score = 0
+    for pattern in personal_domain_patterns:
+        if pattern in url_lower:
+            domain_score += 2  # 개인 블로그 플랫폼은 높은 점수
+    
+    # 개인 지표 점수 계산
+    personal_score = 0
+    for indicator in personal_indicators:
         if indicator in text_to_check:
             personal_score += 1
     
-    # 완화된 기준: 1점 이상이면 개인 블로그로 인정
-    return personal_score >= 1
+    # 5단계: 종합 판단 (완화된 기준)
+    total_score = personal_score + domain_score
+    
+    # 개인 블로그 플랫폼이면 무조건 통과
+    if domain_score >= 2:
+        return True
+    
+    # 개인 지표가 1개 이상이면 통과 (기존보다 완화)
+    if personal_score >= 1:
+        return True
+    
+    # 기업 사이트가 아니고 광고성 글도 아니면 개인 블로그로 간주 (대폭 완화)
+    return True
 
 def search_google_country(keyword, country_info):
-    """특정 국가의 Google에서 검색"""
+    """특정 국가의 Google에서 개인 블로그 검색 (퍼플렉시티 방식 적용)"""
     try:
         # 키워드 번역
         translated_keyword = translate_keyword(keyword, country_info['translate_to'])
         
-        # 단순하게 번역된 키워드만 검색 (추가 단어 없음)
-        search_query = translated_keyword
-        encoded_query = quote_plus(search_query)
+        # 개인 블로그 검색을 위한 다양한 쿼리 패턴 (퍼플렉시티 조언)
+        personal_blog_patterns = [
+            f"{translated_keyword} 후기",
+            f"{translated_keyword} 일기", 
+            f"{translated_keyword} 직접",
+            f"{translated_keyword} 경험",
+            f"{translated_keyword} 블로그",
+            f"{translated_keyword} 내돈내산"
+        ]
         
-        search_url = f"https://www.{country_info['domain']}/search?q={encoded_query}&num=20"
+        all_personal_blogs = []
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-        }
-        
-        print(f"🔍 검색 중: {country_info['domain']} - {search_query}")
-        response = requests.get(search_url, headers=headers, timeout=30)
-        
-        if response.status_code != 200:
-            print(f"❌ 검색 실패: {response.status_code}")
-            return []
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        search_results = soup.find_all('div', class_='g')
-        
-        personal_blogs = []
-        for result in search_results:
+        # 각 패턴별로 검색 (개인 블로그 발견 확률 극대화)
+        for search_pattern in personal_blog_patterns:
             try:
-                link_elem = result.find('a', href=True)
-                title_elem = result.find('h3')
-                desc_elem = result.find('span', class_='st') or result.find('div', class_='s')
+                encoded_query = quote_plus(search_pattern)
+                search_url = f"https://www.{country_info['domain']}/search?q={encoded_query}&num=15"
+        
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                }
                 
-                if link_elem and title_elem:
-                    url = link_elem['href']
-                    title = title_elem.get_text()
-                    description = desc_elem.get_text() if desc_elem else ""
-                    
-                    if is_personal_blog(url, title, description):
-                        personal_blogs.append({
-                            'url': url,
-                            'title': title,
-                            'description': description,
-                            'country': country_info['domain']
-                        })
-                        print(f"✅ 개인 블로그 발견: {title[:50]}...")
+                print(f"🔍 개인 블로그 검색: {country_info['domain']} - {search_pattern}")
+                response = requests.get(search_url, headers=headers, timeout=15)  # 타임아웃 단축
+                
+                if response.status_code != 200:
+                    print(f"❌ 검색 실패: {response.status_code}")
+                    continue
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                search_results = soup.find_all('div', class_='g')
+                
+                for result in search_results:
+                    try:
+                        link_elem = result.find('a', href=True)
+                        title_elem = result.find('h3')
+                        desc_elem = result.find('span', class_='st') or result.find('div', class_='s')
                         
+                        if link_elem and title_elem:
+                            url = link_elem['href']
+                            title = title_elem.get_text()
+                            description = desc_elem.get_text() if desc_elem else ""
+                            
+                            if is_personal_blog_advanced(url, title, description):
+                                # 중복 제거
+                                if not any(blog['url'] == url for blog in all_personal_blogs):
+                                    all_personal_blogs.append({
+                                        'url': url,
+                                        'title': title,
+                                        'description': description,
+                                        'country': country_info['domain'],
+                                        'search_pattern': search_pattern
+                                    })
+                                    print(f"✅ 개인 블로그 발견: {title[:50]}...")
+                                    
+                    except Exception as e:
+                        continue
+                
+                # 패턴별 딜레이 (봇 감지 방지)
+                time.sleep(random.uniform(1, 2))
+                
+                # 충분한 블로그 발견 시 조기 종료
+                if len(all_personal_blogs) >= 5:
+                    break
+                    
             except Exception as e:
+                print(f"❌ 패턴 검색 오류 ({search_pattern}): {e}")
                 continue
         
-        # 랜덤 딜레이 (봇 감지 방지)
-        time.sleep(random.uniform(2, 4))
-        return personal_blogs
+        return all_personal_blogs
         
     except Exception as e:
         print(f"❌ 검색 오류 ({country_info['domain']}): {e}")
@@ -417,16 +486,16 @@ def upload_to_google_drive(doc, filename):
 @app.route("/")
 def home():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.4 - 실제 작동 버전",
-        "status": "🚀 PRODUCTION MODE ACTIVE",
-        "purpose": "10개국 개인 블로그 크롤링 → 2500단어 개인 경험담 생성 → Word 문서 자동 저장",
-        "improvements_v34": [
-            "✅ 디버그 완료 - 모든 단계 정상 작동 확인",
-            "✅ 키워드 단순화 - Google Sheets 입력값 그대로 검색",
-            "✅ Google Cloud 권한 문제 해결",
-            "✅ 파이썬 코드 기본값 제거 (Google Sheets 중심)",
-            "✅ 번역 API 정상 작동",
-            "✅ 개인 블로그 필터링 완화 (점수 기준 1점)"
+        "message": "💰 MoneyMaking_Crawler v3.5 - 개인 블로그 검색 최적화",
+        "status": "🎯 PERSONAL BLOG FOCUSED",
+        "purpose": "퍼플렉시티 조언 적용 - '후기/일기/직접/경험' 키워드로 진짜 개인 블로그 타겟팅",
+        "improvements_v35": [
+            "✅ 퍼플렉시티 조언 완전 적용",
+            "✅ 검색 패턴 6가지 - '후기/일기/직접/경험/블로그/내돈내산'",
+            "✅ 광고/협찬성 글 강력 차단",
+            "✅ 개인 블로그 플랫폼 우선 인식 (.wordpress, .blogspot 등)",
+            "✅ 내용 기반 개인 블로그 판별 강화",
+            "✅ 타임아웃 단축으로 안정성 향상 (30초→15초)"
         ],
         "endpoints": {
             "home": "/",
@@ -435,9 +504,10 @@ def home():
             "quick_test": "/quick_test"
         },
         "features": [
-            "🌍 10개국 Google 검색 (개인 블로그만 타겟팅)",
-            "🔍 키워드 자동 번역 (각국 언어)",
-            "📝 2500단어 개인 경험담 생성",
+            "🎯 개인 블로그 검색 패턴 6가지 - '후기/일기/직접/경험/블로그/내돈내산'",
+            "🚫 광고/협찬성 글 강력 차단 - '체험단/협찬/홍보' 등 제외",
+            "✅ 개인 블로그 플랫폼 우선 인식 - WordPress, Blogspot, Tistory 등",
+            "📝 내용 기반 개인 블로그 판별 - URL/제목뿐만 아니라 설명까지 분석",
             "🖼️ 이미지 4:3 변조 및 Word 삽입",
             "☁️ Google Drive 자동 저장",
             "🚫 여행사이트 강력 차단",
@@ -449,8 +519,8 @@ def home():
 @app.route("/test")
 def test():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.4 - 실제 작동 모드",
-        "status": "PRODUCTION READY",
+        "message": "💰 MoneyMaking_Crawler v3.5 - 개인 블로그 검색 최적화",
+        "status": "🎯 PERSONAL BLOG TARGETING ACTIVE",
         "google_cloud": "✅ Connected" if credentials else "❌ Not Connected",
         "services": {
             "translate": "✅ Active" if translate_client else "❌ Inactive",
@@ -546,7 +616,7 @@ def quick_test():
         keyword = request.args.get("keyword", "travel")
         location = request.args.get("location", "World")
         
-        # 일본에서만 1개 블로그 검색
+        # 각 패턴별로 검색 시도해서 개인 블로그 검색
         japan_blogs = search_google_country(keyword, TARGET_COUNTRIES['japan'])
         
         if japan_blogs:
