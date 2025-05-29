@@ -10,3 +10,4 @@ google-auth==2.23.3
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
 gunicorn==21.2.0
+python-docx==0.8.11
