@@ -1,4 +1,4 @@
-# MoneyMaking_Crawler v3.7 - Bing 검색 테스트 (Google 차단 원인 검증)
+# MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅 (필터링 최소화)
 import os
 import requests
 import json
@@ -56,18 +56,18 @@ else:
     drive_service = None
     docs_service = None
 
-# 10개국 Bing 도메인 및 언어 코드
+# 10개국 Google 도메인 및 언어 코드
 TARGET_COUNTRIES = {
-    'japan': {'domain': 'bing.com', 'lang': 'ja', 'translate_to': 'ja', 'market': 'ja-JP'},
-    'germany': {'domain': 'bing.com', 'lang': 'de', 'translate_to': 'de', 'market': 'de-DE'},
-    'france': {'domain': 'bing.com', 'lang': 'fr', 'translate_to': 'fr', 'market': 'fr-FR'},
-    'italy': {'domain': 'bing.com', 'lang': 'it', 'translate_to': 'it', 'market': 'it-IT'},
-    'spain': {'domain': 'bing.com', 'lang': 'es', 'translate_to': 'es', 'market': 'es-ES'},
-    'netherlands': {'domain': 'bing.com', 'lang': 'nl', 'translate_to': 'nl', 'market': 'nl-NL'},
-    'sweden': {'domain': 'bing.com', 'lang': 'sv', 'translate_to': 'sv', 'market': 'sv-SE'},
-    'norway': {'domain': 'bing.com', 'lang': 'no', 'translate_to': 'no', 'market': 'nb-NO'},
-    'denmark': {'domain': 'bing.com', 'lang': 'da', 'translate_to': 'da', 'market': 'da-DK'},
-    'austria': {'domain': 'bing.com', 'lang': 'de', 'translate_to': 'de', 'market': 'de-AT'}
+    'japan': {'domain': 'google.co.jp', 'lang': 'ja', 'translate_to': 'ja'},
+    'germany': {'domain': 'google.de', 'lang': 'de', 'translate_to': 'de'},
+    'france': {'domain': 'google.fr', 'lang': 'fr', 'translate_to': 'fr'},
+    'italy': {'domain': 'google.it', 'lang': 'it', 'translate_to': 'it'},
+    'spain': {'domain': 'google.es', 'lang': 'es', 'translate_to': 'es'},
+    'netherlands': {'domain': 'google.nl', 'lang': 'nl', 'translate_to': 'nl'},
+    'sweden': {'domain': 'google.se', 'lang': 'sv', 'translate_to': 'sv'},
+    'norway': {'domain': 'google.no', 'lang': 'no', 'translate_to': 'no'},
+    'denmark': {'domain': 'google.dk', 'lang': 'da', 'translate_to': 'da'},
+    'austria': {'domain': 'google.at', 'lang': 'de', 'translate_to': 'de'}
 }
 
 # 여행사이트 및 기업 사이트 강력 차단 리스트
