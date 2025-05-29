@@ -1,4 +1,4 @@
-# MoneyMaking_Crawler v3.5 - 개인 블로그 검색 최적화 (퍼플렉시티 조언 적용)
+# MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅 (필터링 최소화)
 import os
 import requests
 import json
@@ -124,75 +124,25 @@ def translate_keyword(keyword, target_language):
         print(f"번역 오류: {e}")
         return keyword
 
-def is_personal_blog_advanced(url, title, description):
-    """개인 블로그 여부 판별 (퍼플렉시티 방식 + 내용 분석 강화)"""
+def is_valid_blog_simple(url):
+    """간단한 블로그 검증 (최소한의 필터링)"""
     if not url:
         return False
     
     url_lower = url.lower()
-    title_lower = title.lower() if title else ""
-    desc_lower = description.lower() if description else ""
     
-    # 1단계: 기업 사이트 강력 차단 (기존 유지)
-    for exclusion in CORPORATE_EXCLUSIONS:
-        if exclusion in url_lower:
+    # 명백한 기업 사이트만 차단 (최소한만)
+    major_corporate_sites = [
+        'booking.com', 'tripadvisor.com', 'expedia.com', 
+        'hotels.com', 'airbnb.com', 'agoda.com',
+        'wikipedia.org', 'lonelyplanet.com'
+    ]
+    
+    for corporate in major_corporate_sites:
+        if corporate in url_lower:
             return False
     
-    # 2단계: 광고/협찬성 글 감지 및 차단 (퍼플렉시티 조언)
-    spam_indicators = [
-        '체험단', '협찬', 'sponsored', '홍보', '광고', 'ad', 'pr',
-        '제공받', '무료체험', '캠페인', '이벤트', '증정', '할인'
-    ]
-    
-    text_to_check = f"{url_lower} {title_lower} {desc_lower}"
-    for spam in spam_indicators:
-        if spam in text_to_check:
-            return False  # 광고성 글 차단
-    
-    # 3단계: 개인 블로그 긍정 지표 확인 (퍼플렉시티 조언 반영)
-    personal_indicators = [
-        # 기존 지표들
-        'blog', 'diary', 'travel', 'journey', 'experience', 'visit', 'trip',
-        'my', 'personal', 'life', 'adventure', 'story', 'log', 'went', 'been',
-        'vacation', 'holiday', 'backpack', 'solo', 'couple', 'family',
-        
-        # 퍼플렉시티 조언 추가 지표들
-        '후기', '일기', '직접', '경험', '내돈내산', '솔직', '리얼',
-        '다녀온', '다녀와서', '여행기', '기록', '추억', '느낀', 
-        '생각', '추천', '비추', '아쉬운', '좋았던', '불편한'
-    ]
-    
-    # 4단계: 개인 블로그 도메인 패턴 인식 (퍼플렉시티 조언)
-    personal_domain_patterns = [
-        '.wordpress.com', '.blogspot.com', '.tistory.com', '.naver.com',
-        '.daum.net', '.egloos.com', '.velog.io', '.github.io',
-        'medium.com/@', 'tumblr.com'
-    ]
-    
-    # 도메인 패턴 점수
-    domain_score = 0
-    for pattern in personal_domain_patterns:
-        if pattern in url_lower:
-            domain_score += 2  # 개인 블로그 플랫폼은 높은 점수
-    
-    # 개인 지표 점수 계산
-    personal_score = 0
-    for indicator in personal_indicators:
-        if indicator in text_to_check:
-            personal_score += 1
-    
-    # 5단계: 종합 판단 (완화된 기준)
-    total_score = personal_score + domain_score
-    
-    # 개인 블로그 플랫폼이면 무조건 통과
-    if domain_score >= 2:
-        return True
-    
-    # 개인 지표가 1개 이상이면 통과 (기존보다 완화)
-    if personal_score >= 1:
-        return True
-    
-    # 기업 사이트가 아니고 광고성 글도 아니면 개인 블로그로 간주 (대폭 완화)
+    # 나머지는 모두 개인 블로그로 간주
     return True
 
 def search_google_country(keyword, country_info):
@@ -486,16 +436,16 @@ def upload_to_google_drive(doc, filename):
 @app.route("/")
 def home():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.5 - 개인 블로그 검색 최적화",
-        "status": "🎯 PERSONAL BLOG FOCUSED",
-        "purpose": "퍼플렉시티 조언 적용 - '후기/일기/직접/경험' 키워드로 진짜 개인 블로그 타겟팅",
-        "improvements_v35": [
-            "✅ 퍼플렉시티 조언 완전 적용",
-            "✅ 검색 패턴 6가지 - '후기/일기/직접/경험/블로그/내돈내산'",
-            "✅ 광고/협찬성 글 강력 차단",
-            "✅ 개인 블로그 플랫폼 우선 인식 (.wordpress, .blogspot 등)",
-            "✅ 내용 기반 개인 블로그 판별 강화",
-            "✅ 타임아웃 단축으로 안정성 향상 (30초→15초)"
+        "message": "💰 MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅",
+        "status": "🎯 DIRECT BLOG TARGETING",
+        "purpose": "복잡한 필터링 제거 → 개인 블로그 플랫폼 직접 검색으로 단순화",
+        "improvements_v36": [
+            "✅ 개인 블로그 플랫폼 직접 타겟팅 - site:wordpress.com, site:blogspot.com",
+            "✅ 복잡한 필터링 로직 90% 제거 - 단순하고 빠른 처리",
+            "✅ 해외 전용 검색 패턴 - tistory 제거, medium 추가", 
+            "✅ 최소한의 기업 사이트만 차단 - 8개 주요 사이트만",
+            "✅ 타임아웃 10초로 최적화 - 안정성 극대화",
+            "✅ 검색 패턴 6개로 최적화 - 개인 블로그 직접 검색"
         ],
         "endpoints": {
             "home": "/",
@@ -504,10 +454,10 @@ def home():
             "quick_test": "/quick_test"
         },
         "features": [
-            "🎯 개인 블로그 검색 패턴 6가지 - '후기/일기/직접/경험/블로그/내돈내산'",
-            "🚫 광고/협찬성 글 강력 차단 - '체험단/협찬/홍보' 등 제외",
-            "✅ 개인 블로그 플랫폼 우선 인식 - WordPress, Blogspot, Tistory 등",
-            "📝 내용 기반 개인 블로그 판별 - URL/제목뿐만 아니라 설명까지 분석",
+            "🎯 개인 블로그 플랫폼 직접 검색 - WordPress, Blogspot, Medium",
+            "⚡ 복잡한 필터링 90% 제거 - 빠르고 단순한 처리",
+            "🌍 해외 블로그 전용 최적화 - 각국 언어별 개인 블로그 타겟팅",
+            "🚫 최소한의 기업 사이트만 차단 - 8개 주요 사이트 (booking, tripadvisor 등)",
             "🖼️ 이미지 4:3 변조 및 Word 삽입",
             "☁️ Google Drive 자동 저장",
             "🚫 여행사이트 강력 차단",
@@ -519,8 +469,8 @@ def home():
 @app.route("/test")
 def test():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.5 - 개인 블로그 검색 최적화",
-        "status": "🎯 PERSONAL BLOG TARGETING ACTIVE",
+        "message": "💰 MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅",
+        "status": "⚡ SIMPLIFIED & FAST",
         "google_cloud": "✅ Connected" if credentials else "❌ Not Connected",
         "services": {
             "translate": "✅ Active" if translate_client else "❌ Inactive",
