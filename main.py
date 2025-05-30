@@ -353,8 +353,8 @@ def create_word_document(article, keyword, location):
     
     return doc
 
-def upload_to_google_drive(doc, filename):
-    """Google Drive에 문서 업로드"""
+def upload_to_google_drive(doc, filename, folder_id=None):
+    """Google Drive에 문서 업로드 (폴더 ID 개선)"""
     try:
         if not drive_service:
             return None
@@ -365,10 +365,9 @@ def upload_to_google_drive(doc, filename):
             temp_file_path = temp_file.name
         
         # Google Drive 업로드
-        file_metadata = {
-            'name': filename,
-            'parents': ['1BuJH_Ti-zl9vK6zWy0e79sNFiXpzLwPH']  # 지정된 폴더 ID
-        }
+        file_metadata = {'name': filename}
+        if folder_id:
+            file_metadata['parents'] = [folder_id]
         
         media = MediaFileUpload(temp_file_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         
@@ -400,9 +399,11 @@ def home():
         "improvements_v39": [
             "🗑️ 기업 사이트 차단 리스트 완전 삭제",
             "✅ 모든 사이트를 개인 블로그로 인정 (return True)",
+            "🐛 함수명 버그 수정 - is_personal_blog_advanced → is_valid_blog_simple",
             "🎯 개인 블로그 플랫폼만 직접 검색 (WordPress, Blogspot, Medium)",
             "⚡ 복잡한 필터링 로직 100% 제거",
             "🔍 URL과 제목만 있으면 무조건 통과",
+            "📁 Google Drive 폴더 ID 환경변수 지원",
             "📈 개인 블로그 발견율 극대화"
         ],
         "endpoints": {
@@ -488,7 +489,10 @@ def global_crawl():
         
         # 4단계: Google Drive 업로드
         filename = f"{keyword.replace(' ', '_')}_{location}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.docx"
-        upload_result = upload_to_google_drive(doc, filename)
+        
+        # Google Drive 폴더 ID - 환경변수로 설정 가능하도록 개선
+        drive_folder_id = os.environ.get('GOOGLE_DRIVE_FOLDER_ID', '1BuJH_Ti-zl9vK6zWy0e79sNFiXpzLwPH')
+        upload_result = upload_to_google_drive(doc, filename, drive_folder_id)
         
         # 결과 반환
         result = {
