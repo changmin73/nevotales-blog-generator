@@ -1,4 +1,4 @@
-# MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅 (필터링 최소화)
+# MoneyMaking_Crawler v3.9 - 기업 차단 제거, 개인 블로그만 검색
 import os
 import requests
 import json
@@ -56,7 +56,7 @@ else:
     drive_service = None
     docs_service = None
 
-# 10개국 Google 도메인 및 언어 코드
+# 10개국 Google 도메인 및 언어 코드 (Google 복원)
 TARGET_COUNTRIES = {
     'japan': {'domain': 'google.co.jp', 'lang': 'ja', 'translate_to': 'ja'},
     'germany': {'domain': 'google.de', 'lang': 'de', 'translate_to': 'de'},
@@ -70,37 +70,12 @@ TARGET_COUNTRIES = {
     'austria': {'domain': 'google.at', 'lang': 'de', 'translate_to': 'de'}
 }
 
-# 여행사이트 및 기업 사이트 강력 차단 리스트
-CORPORATE_EXCLUSIONS = [
-    # 여행 예약 사이트
-    'booking.com', 'tripadvisor', 'expedia', 'hotels.com', 'airbnb',
-    'agoda.com', 'kayak.com', 'priceline.com', 'orbitz.com',
-    'travelocity.com', 'cheaptickets.com', 'momondo.com', 'skyscanner.com',
-    'hostelworld.com', 'hostelbookers.com', 'viator.com', 'getyourguide.com',
-    'klook.com', 'tiqets.com', 'civitatis.com', 'attractiontix.com',
-    'travel.com', 'travelzoo.com', 'groupon.com',
-    
-    # 여행 가이드 사이트
-    'wikipedia', 'wikitravel', 'lonelyplanet', 'touropia', 'timeout',
-    'fodors.com', 'frommers.com', 'ricksteves.com', 'atlasob scura.com',
-    'culturetrip.com', 'theculturetrip.com', 'roughguides.com',
-    'planetware.com', 'tripsavvy.com', 'afar.com', 'travelandleisure.com',
-    'cntraveler.com', 'nationalgeographic.com', 'smithsonianmag.com',
-    
-    # 정부 및 공식 사이트
-    'destination', 'tourism', 'visit', 'official', 'government', '.gov',
-    'chamber', 'convention', 'bureau', 'authority',
-    
-    # 뉴스 사이트
-    'cnn.com', 'bbc.com', 'reuters.com', 'ap.org', 'nytimes.com'
-]
+# 기업 사이트 차단 리스트 완전 제거 - 모든 사이트 허용!
 
-# 개인 블로그 지표 키워드
-PERSONAL_BLOG_INDICATORS = [
-    'blog', 'diary', 'travel', 'journey', 'experience', 'visit', 'trip',
-    'my', 'personal', 'life', 'adventure', 'story', 'log', 'went', 'been',
-    'vacation', 'holiday', 'backpack', 'solo', 'couple', 'family',
-    'review', 'guide', 'tips', 'recommendation', 'amazing', 'beautiful'
+# 개인 블로그 지표 키워드 (검색용)
+PERSONAL_BLOG_SEARCH_TERMS = [
+    'blog', 'diary', 'travel blog', 'personal blog', 'my travel', 'my trip',
+    'travel experience', 'travel story', 'travel journal', 'vacation blog'
 ]
 
 def translate_keyword(keyword, target_language):
@@ -125,25 +100,8 @@ def translate_keyword(keyword, target_language):
         return keyword
 
 def is_valid_blog_simple(url):
-    """간단한 블로그 검증 (최소한의 필터링)"""
-    if not url:
-        return False
-    
-    url_lower = url.lower()
-    
-    # 명백한 기업 사이트만 차단 (최소한만)
-    major_corporate_sites = [
-        'booking.com', 'tripadvisor.com', 'expedia.com', 
-        'hotels.com', 'airbnb.com', 'agoda.com',
-        'wikipedia.org', 'lonelyplanet.com'
-    ]
-    
-    for corporate in major_corporate_sites:
-        if corporate in url_lower:
-            return False
-    
-    # 나머지는 모두 개인 블로그로 간주
-    return True
+    """완전히 제거 - 모든 사이트를 블로그로 인정"""
+    return True  # 모든 사이트 통과!
 
 def search_google_country(keyword, country_info):
     """특정 국가의 Google에서 개인 블로그 검색 (퍼플렉시티 방식 적용)"""
@@ -436,16 +394,16 @@ def upload_to_google_drive(doc, filename):
 @app.route("/")
 def home():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅",
-        "status": "🎯 DIRECT BLOG TARGETING",
-        "purpose": "복잡한 필터링 제거 → 개인 블로그 플랫폼 직접 검색으로 단순화",
-        "improvements_v36": [
-            "✅ 개인 블로그 플랫폼 직접 타겟팅 - site:wordpress.com, site:blogspot.com",
-            "✅ 복잡한 필터링 로직 90% 제거 - 단순하고 빠른 처리",
-            "✅ 해외 전용 검색 패턴 - tistory 제거, medium 추가", 
-            "✅ 최소한의 기업 사이트만 차단 - 8개 주요 사이트만",
-            "✅ 타임아웃 10초로 최적화 - 안정성 극대화",
-            "✅ 검색 패턴 6개로 최적화 - 개인 블로그 직접 검색"
+        "message": "💰 MoneyMaking_Crawler v3.9 - 필터링 완전 제거",
+        "status": "🚀 NO FILTERING - ALL SITES ACCEPTED",
+        "purpose": "기업 사이트 차단 완전 제거 → 모든 검색 결과를 개인 블로그로 인정",
+        "improvements_v39": [
+            "🗑️ 기업 사이트 차단 리스트 완전 삭제",
+            "✅ 모든 사이트를 개인 블로그로 인정 (return True)",
+            "🎯 개인 블로그 플랫폼만 직접 검색 (WordPress, Blogspot, Medium)",
+            "⚡ 복잡한 필터링 로직 100% 제거",
+            "🔍 URL과 제목만 있으면 무조건 통과",
+            "📈 개인 블로그 발견율 극대화"
         ],
         "endpoints": {
             "home": "/",
@@ -454,10 +412,10 @@ def home():
             "quick_test": "/quick_test"
         },
         "features": [
-            "🎯 개인 블로그 플랫폼 직접 검색 - WordPress, Blogspot, Medium",
-            "⚡ 복잡한 필터링 90% 제거 - 빠르고 단순한 처리",
-            "🌍 해외 블로그 전용 최적화 - 각국 언어별 개인 블로그 타겟팅",
-            "🚫 최소한의 기업 사이트만 차단 - 8개 주요 사이트 (booking, tripadvisor 등)",
+            "🗑️ 모든 기업 사이트 차단 제거 - Booking, TripAdvisor 등 차단 없음",
+            "✅ 100% 통과 필터링 - URL과 제목만 있으면 개인 블로그 인정",
+            "🎯 개인 블로그 플랫폼 직접 검색 - WordPress, Blogspot, Medium 위주",
+            "⚡ 필터링 로직 완전 제거 - 처리 속도 극대화",
             "🖼️ 이미지 4:3 변조 및 Word 삽입",
             "☁️ Google Drive 자동 저장",
             "🚫 여행사이트 강력 차단",
@@ -469,8 +427,8 @@ def home():
 @app.route("/test")
 def test():
     return {
-        "message": "💰 MoneyMaking_Crawler v3.6 - 개인 블로그 직접 타겟팅",
-        "status": "⚡ SIMPLIFIED & FAST",
+        "message": "💰 MoneyMaking_Crawler v3.9 - 필터링 완전 제거",
+        "status": "🚀 ALL SITES ACCEPTED",
         "google_cloud": "✅ Connected" if credentials else "❌ Not Connected",
         "services": {
             "translate": "✅ Active" if translate_client else "❌ Inactive",
@@ -499,7 +457,7 @@ def global_crawl():
         
         print(f"🚀 글로벌 크롤링 시작: {keyword} in {location} (최대 {max_blogs}개 블로그)")
         
-        # 1단계: 10개국에서 개인 블로그 검색
+        # 1단계: 10개국에서 개인 블로그 검색 (필터링 없음)
         all_blogs = []
         for country_name, country_info in TARGET_COUNTRIES.items():
             print(f"🔍 {country_name} 검색 중...")
@@ -566,7 +524,7 @@ def quick_test():
         keyword = request.args.get("keyword", "travel")
         location = request.args.get("location", "World")
         
-        # 각 패턴별로 검색 시도해서 개인 블로그 검색
+        # 개인 블로그 검색 (필터링 없음)
         japan_blogs = search_google_country(keyword, TARGET_COUNTRIES['japan'])
         
         if japan_blogs:
