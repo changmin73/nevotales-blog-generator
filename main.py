@@ -7,7 +7,8 @@ from PIL import Image, ImageEnhance
 import random
 from io import BytesIO
 import base64
-from pyairtable import Api
+import cloudinary
+import cloudinary.uploader
 import json
 from datetime import datetime
 import hashlib
@@ -16,13 +17,14 @@ app = Flask(__name__)
 
 # 환경변수 설정
 openai.api_key = os.getenv('OPENAI_API_KEY')
-AIRTABLE_API_KEY = os.getenv('AIRTABLE_API_KEY')
-AIRTABLE_BASE_ID = os.getenv('AIRTABLE_BASE_ID')
 MAKE_WEBHOOK_URL = os.getenv('MAKE_WEBHOOK_URL')
 
-# Airtable 초기화
-airtable = Api(AIRTABLE_API_KEY)
-table = airtable.table(AIRTABLE_BASE_ID, 'Blog_Images')  # 테이블 이름 확인 필요
+# Cloudinary 설정
+cloudinary.config(
+    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key = os.getenv('CLOUDINARY_API_KEY'),
+    api_secret = os.getenv('CLOUDINARY_API_SECRET')
+)
 
 class BlogProcessor:
     def __init__(self):
@@ -147,25 +149,30 @@ class BlogProcessor:
             print(f"Error processing image {image_url}: {str(e)}")
             return None, None
     
-    def upload_to_airtable(self, image_bytes, filename, alt_text, keyword):
-        """Airtable에 이미지 업로드"""
+    def upload_to_cloudinary(self, image_bytes, filename, keyword):
+        """Cloudinary에 이미지 업로드"""
         try:
-            # Base64 인코딩
-            img_base64 = base64.b64encode(image_bytes).decode()
+            # BytesIO 객체로 변환
+            image_file = BytesIO(image_bytes)
             
-            # Airtable 레코드 생성
-            record = table.create({
-                'Image': [{'url': f'data:image/jpeg;base64,{img_base64}'}],
-                'Alt_Text': alt_text,
-                'Blog_Title': f"{keyword} Travel Guide",
-                'Created_Date': datetime.now().isoformat()
-            })
+            # Cloudinary에 업로드
+            upload_result = cloudinary.uploader.upload(
+                image_file,
+                public_id=filename,
+                folder=f"blog/{keyword}",
+                resource_type="image",
+                format="jpg",
+                transformation=[
+                    {'quality': 'auto:good'},
+                    {'fetch_format': 'auto'}
+                ]
+            )
             
             # 업로드된 이미지 URL 반환
-            return record['fields']['Image'][0]['url']
+            return upload_result['secure_url']
             
         except Exception as e:
-            print(f"Error uploading to Airtable: {str(e)}")
+            print(f"Error uploading to Cloudinary: {str(e)}")
             return None
 
 @app.route('/process-blog', methods=['POST'])
@@ -195,13 +202,13 @@ def process_blog():
                 filename = f"{keyword}-travel-{idx+1}-{random.randint(1000,9999)}.jpg"
                 alt_text = f"{keyword} travel experience photo {idx+1}"
                 
-                airtable_url = processor.upload_to_airtable(
-                    img_bytes, filename, alt_text, keyword
+                cloudinary_url = processor.upload_to_cloudinary(
+                    img_bytes, filename, keyword
                 )
                 
-                if airtable_url:
+                if cloudinary_url:
                     processed_images.append({
-                        'url': airtable_url,
+                        'url': cloudinary_url,
                         'alt': alt_text
                     })
         
