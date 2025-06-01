@@ -3,5 +3,5 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 openai==0.28.1
 Pillow==10.0.1
-pyairtable==2.1.0
+cloudinary==1.36.0
 gunicorn==21.2.0
